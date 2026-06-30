@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "model": "Xenova/all-MiniLM-L6-v2",
+  "dimensions": 384,
+  "status": "complete",
+  "totalFiles": 24,
+  "indexedFiles": 24,
+  "totalChunks": 214,
+  "batchCount": 1,
+  "files": {
+    "architecture\\decision-flow.md": {
+      "mtime": 1782847956171.2698,
+      "size": 5167,
+      "batches": []
+    },
+    "architecture\\decisions.md": {
+      "mtime": 1782848035442.5461,
+      "size": 6880,
+      "batches": []
+    },
+    "architecture\\overview.md": {
+      "mtime": 1782847922308.2227,
+      "size": 5183,
+      "batches": []
+    },
+    "architecture\\wire-contract.md": {
+      "mtime": 1782847992047.5464,
+      "size": 5235,
+      "batches": []
+    },
+    "best-practices\\caching-safely.md": {
+      "mtime": 1782848107367.6042,
+      "size": 4855,
+      "batches": []
+    },
+    "best-practices\\fail-closed-discipline.md": {
+      "mtime": 1782848071230.7327,
+      "size": 4820,
+      "batches": []
+    },
+    "concepts\\decision-model.md": {
+      "mtime": 1782847791782.5532,
+      "size": 5680,
+      "batches": []
+    },
+    "concepts\\fail-closed.md": {
+      "mtime": 1782847749730.2385,
+      "size": 8049,
+      "batches": []
+    },
+    "concepts\\step-up-aal.md": {
+      "mtime": 1782847833487.107,
+      "size": 5169,
+      "batches": []
+    },
+    "concepts\\token-verification.md": {
+      "mtime": 1782847881895.9514,
+      "size": 7294,
+      "batches": []
+    },
+    "core-concepts.md": {
+      "mtime": 1782847420318.236,
+      "size": 6069,
+      "batches": []
+    },
+    "guides\\caching.md": {
+      "mtime": 1782847691519.9915,
+      "size": 4745,
+      "batches": []
+    },
+    "guides\\checking-permissions.md": {
+      "mtime": 1782847459674.282,
+      "size": 5336,
+      "batches": []
+    },
+    "guides\\express.md": {
+      "mtime": 1782847498135.398,
+      "size": 5484,
+      "batches": []
+    },
+    "guides\\fastify.md": {
+      "mtime": 1782847571471.1914,
+      "size": 3618,
+      "batches": []
+    },
+    "guides\\list-resources.md": {
+      "mtime": 1782847648966.2524,
+      "size": 3642,
+      "batches": []
+    },
+    "guides\\verifying-tokens.md": {
+      "mtime": 1782847612831.025,
+      "size": 5707,
+      "batches": []
+    },
+    "index.md": {
+      "mtime": 1782847300548.5996,
+      "size": 10605,
+      "batches": []
+    },
+    "installation.md": {
+      "mtime": 1782847379035.1636,
+      "size": 4350,
+      "batches": []
+    },
+    "quickstart.md": {
+      "mtime": 1782847344889.9185,
+      "size": 6033,
+      "batches": []
+    },
+    "reference\\client.md": {
+      "mtime": 1782848151222.9888,
+      "size": 6098,
+      "batches": []
+    },
+    "reference\\errors.md": {
+      "mtime": 1782848247893.1672,
+      "size": 4294,
+      "batches": []
+    },
+    "reference\\middleware.md": {
+      "mtime": 1782848184964.79,
+      "size": 4970,
+      "batches": []
+    },
+    "reference\\types.md": {
+      "mtime": 1782848215912.1848,
+      "size": 4466,
+      "batches": []
+    }
+  }
+}

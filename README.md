@@ -5,8 +5,11 @@
 [![tests](https://github.com/padosoft/laravel-iam-node/actions/workflows/tests.yml/badge.svg)](https://github.com/padosoft/laravel-iam-node/actions/workflows/tests.yml)
 [![npm](https://img.shields.io/npm/v/@padosoft/laravel-iam-node.svg)](https://www.npmjs.com/package/@padosoft/laravel-iam-node)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![docs](https://img.shields.io/badge/docs-doc.laravel--iam--node.padosoft.com-0d9488.svg)](https://doc.laravel-iam-node.padosoft.com)
 
 Ask the IAM server *"is this subject allowed to do this?"* and verify its tokens — from any Node service, with the **exact same wire contract and guarantees as the PHP client**. No policy logic lives here: every decision is the server's.
+
+📚 **Full documentation:** **[doc.laravel-iam-node.padosoft.com](https://doc.laravel-iam-node.padosoft.com)** — theory of fail-closed, decision-flow & token-verification diagrams, ADRs, Express/Fastify quickstarts, and the complete API reference.
 
 ## Why
 
@@ -126,6 +129,20 @@ This SDK speaks the canonical decision contract (`01-architecture.md` §12), mir
 - **Body:** `{ subject:{type,id}, permission, organization, application, resource, context, current_aal, explain }`
 - **Response:** the server's `Decision` (a `{ "data": { … } }` envelope is unwrapped transparently)
 
+## Ecosystem
+
+This SDK is one client in the **Laravel IAM** family — a server (the PDP) plus a polyglot fleet of thin, fail-closed clients sharing one wire contract and one audit trail:
+
+- **[laravel-iam-server](https://doc.laravel-iam-server.padosoft.com)** — the IAM server: identity, org, Application Registry, PDP (RBAC + ABAC + ReBAC), OAuth/OIDC, tamper-evident audit, Admin API + panel.
+- **[laravel-iam-contracts](https://doc.laravel-iam-contracts.padosoft.com)** — shared contracts/interfaces + DTOs.
+- **[laravel-iam-client](https://doc.laravel-iam-client.padosoft.com)** — the Laravel client for consumer apps (OIDC login, JWKS verify, `iam.auth`/`iam.can` middleware).
+- **[laravel-iam-react-native](https://doc.laravel-iam-react-native.padosoft.com)** — React Native client SDK (thin + hooks).
+- **[laravel-iam-rust](https://doc.laravel-iam-rust.padosoft.com)** — Rust client SDK (async + blocking, fail-closed).
+
+## Documentation
+
+Full docs — fail-closed theory, mermaid decision/token-verification diagrams, ADRs, Express & Fastify quickstarts, and a complete API reference — live at **[doc.laravel-iam-node.padosoft.com](https://doc.laravel-iam-node.padosoft.com)**.
+
 ## License
 
-MIT © [Padosoft](https://www.padosoft.com)
+MIT © [Padosoft](https://www.padosoft.com) · [npm](https://www.npmjs.com/package/@padosoft/laravel-iam-node)

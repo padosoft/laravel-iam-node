@@ -1,0 +1,146 @@
+{
+  "title": "laravel-iam-node",
+  "description": "Laravel IAM Node/TypeScript client SDK — thin, fail-closed client over the IAM PDP (decisions/check) + JWKS token verification, with Express/Fastify middleware.",
+  "url": "https://doc.laravel-iam-node.padosoft.com",
+  "src": "docs",
+  "out": "_site",
+  "base": "/",
+
+  "favicon": "assets/favicon.svg",
+  "theme": {
+    "name": "default",
+    "defaultMode": "dark",
+    "customCss": ["assets/custom.css"]
+  },
+
+  "autoTitleFromH1": true,
+  "copyCode": true,
+  "pageNavigation": true,
+  "minify": true,
+  "markdown": { "breaks": true },
+
+  "layout": {
+    "spa": true,
+    "header": { "enabled": true },
+    "sidebar": { "collapsible": true, "defaultCollapsed": false },
+    "optionsMenu": {
+      "position": "header",
+      "components": { "search": true, "themeSwitch": true }
+    }
+  },
+
+  "navigation": [
+    {
+      "title": "Get Started",
+      "icon": "rocket",
+      "children": [
+        { "title": "Introduction", "path": "/" },
+        { "title": "Quickstart", "path": "/quickstart" },
+        { "title": "Installation", "path": "/installation" },
+        { "title": "Core concepts", "path": "/core-concepts" }
+      ]
+    },
+    {
+      "title": "Guides",
+      "icon": "book-open",
+      "children": [
+        { "title": "Checking permissions", "path": "/guides/checking-permissions" },
+        { "title": "Express middleware", "path": "/guides/express" },
+        { "title": "Fastify middleware", "path": "/guides/fastify" },
+        { "title": "Verifying tokens (JWKS)", "path": "/guides/verifying-tokens" },
+        { "title": "ReBAC list-resources", "path": "/guides/list-resources" },
+        { "title": "Caching decisions", "path": "/guides/caching" }
+      ]
+    },
+    {
+      "title": "Concepts & Theory",
+      "icon": "square-function",
+      "children": [
+        { "title": "Fail-closed by design", "path": "/concepts/fail-closed" },
+        { "title": "The decision model", "path": "/concepts/decision-model" },
+        { "title": "Step-up & AAL", "path": "/concepts/step-up-aal" },
+        { "title": "Token verification theory", "path": "/concepts/token-verification" }
+      ]
+    },
+    {
+      "title": "Architecture",
+      "icon": "workflow",
+      "children": [
+        { "title": "Architecture overview", "path": "/architecture/overview" },
+        { "title": "Decision flow", "path": "/architecture/decision-flow" },
+        { "title": "Wire contract", "path": "/architecture/wire-contract" },
+        { "title": "ADR", "path": "/architecture/decisions" }
+      ]
+    },
+    {
+      "title": "Best Practices",
+      "icon": "lightbulb",
+      "children": [
+        { "title": "Fail-closed discipline", "path": "/best-practices/fail-closed-discipline" },
+        { "title": "Caching safely", "path": "/best-practices/caching-safely" }
+      ]
+    },
+    {
+      "title": "Reference",
+      "icon": "book-marked",
+      "children": [
+        { "title": "IamClient API", "path": "/reference/client" },
+        { "title": "Middleware API", "path": "/reference/middleware" },
+        { "title": "Types", "path": "/reference/types" },
+        { "title": "Errors", "path": "/reference/errors" }
+      ]
+    },
+    {
+      "title": "Links",
+      "children": [
+        { "title": "GitHub", "path": "https://github.com/padosoft/laravel-iam-node", "external": true },
+        { "title": "npm", "path": "https://www.npmjs.com/package/@padosoft/laravel-iam-node", "external": true }
+      ]
+    }
+  ],
+
+  "footer": {
+    "style": "minimal",
+    "branding": true,
+    "content": "© Lorenzo Padovani — [Padosoft](https://github.com/padosoft) · [GitHub](https://github.com/padosoft/laravel-iam-node) · MIT",
+    "columns": [
+      {
+        "title": "Project",
+        "links": [
+          { "title": "GitHub", "path": "https://github.com/padosoft/laravel-iam-node", "external": true },
+          { "title": "npm", "path": "https://www.npmjs.com/package/@padosoft/laravel-iam-node", "external": true }
+        ]
+      },
+      {
+        "title": "Author",
+        "links": [
+          { "title": "Lorenzo Padovani", "path": "https://github.com/lorenzo-padovani", "external": true },
+          { "title": "Padosoft", "path": "https://github.com/padosoft", "external": true }
+        ]
+      }
+    ]
+  },
+
+  "plugins": {
+    "search": { "enabled": true, "semantic": true, "placeholder": "Search the docs…" },
+    "git": {
+      "repo": "https://github.com/padosoft/laravel-iam-node",
+      "branch": "main",
+      "editLink": true,
+      "lastUpdated": true,
+      "commitHistory": true,
+      "dateFormat": "relative"
+    },
+    "seo": {
+      "defaultDescription": "Laravel IAM Node/TypeScript client SDK — thin, fail-closed client over the IAM PDP + JWKS token verification.",
+      "aiBots": true,
+      "openGraph": {},
+      "twitter": { "cardType": "summary_large_image" }
+    },
+    "sitemap": { "defaultChangefreq": "weekly", "defaultPriority": 0.8 },
+    "mermaid": {},
+    "math": {},
+    "llms": { "fullContext": true },
+    "analytics": { "enabled": false }
+  }
+}

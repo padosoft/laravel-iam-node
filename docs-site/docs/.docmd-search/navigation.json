@@ -1,0 +1,100 @@
+{
+  "tree": [
+    {
+      "title": "Architecture\\Decision Flow",
+      "path": "architecture\\decision-flow.md"
+    },
+    {
+      "title": "Architecture\\Decisions",
+      "path": "architecture\\decisions.md"
+    },
+    {
+      "title": "Architecture\\Overview",
+      "path": "architecture\\overview.md"
+    },
+    {
+      "title": "Architecture\\Wire Contract",
+      "path": "architecture\\wire-contract.md"
+    },
+    {
+      "title": "Best Practices\\Caching Safely",
+      "path": "best-practices\\caching-safely.md"
+    },
+    {
+      "title": "Best Practices\\Fail Closed Discipline",
+      "path": "best-practices\\fail-closed-discipline.md"
+    },
+    {
+      "title": "Concepts\\Decision Model",
+      "path": "concepts\\decision-model.md"
+    },
+    {
+      "title": "Concepts\\Fail Closed",
+      "path": "concepts\\fail-closed.md"
+    },
+    {
+      "title": "Concepts\\Step Up Aal",
+      "path": "concepts\\step-up-aal.md"
+    },
+    {
+      "title": "Concepts\\Token Verification",
+      "path": "concepts\\token-verification.md"
+    },
+    {
+      "title": "Core Concepts",
+      "path": "core-concepts.md"
+    },
+    {
+      "title": "Guides\\Caching",
+      "path": "guides\\caching.md"
+    },
+    {
+      "title": "Guides\\Checking Permissions",
+      "path": "guides\\checking-permissions.md"
+    },
+    {
+      "title": "Guides\\Express",
+      "path": "guides\\express.md"
+    },
+    {
+      "title": "Guides\\Fastify",
+      "path": "guides\\fastify.md"
+    },
+    {
+      "title": "Guides\\List Resources",
+      "path": "guides\\list-resources.md"
+    },
+    {
+      "title": "Guides\\Verifying Tokens",
+      "path": "guides\\verifying-tokens.md"
+    },
+    {
+      "title": "Index",
+      "path": "index.md"
+    },
+    {
+      "title": "Installation",
+      "path": "installation.md"
+    },
+    {
+      "title": "Quickstart",
+      "path": "quickstart.md"
+    },
+    {
+      "title": "Reference\\Client",
+      "path": "reference\\client.md"
+    },
+    {
+      "title": "Reference\\Errors",
+      "path": "reference\\errors.md"
+    },
+    {
+      "title": "Reference\\Middleware",
+      "path": "reference\\middleware.md"
+    },
+    {
+      "title": "Reference\\Types",
+      "path": "reference\\types.md"
+    }
+  ]
+}
