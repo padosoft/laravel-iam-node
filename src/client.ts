@@ -78,7 +78,7 @@ export class IamClient {
     const explain = query.explain === true;
 
     // Explain queries are never cached (fresh, non-shared reasoning).
-    const key = !explain && this.cache.enabled ? await cacheKey(payload) : undefined;
+    const key = !explain && this.cache.enabled ? cacheKey(payload) : undefined;
     if (key !== undefined) {
       const cached = this.cache.get(key);
       if (cached) return cached;

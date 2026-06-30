@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Decision } from './types.js';
 
 interface Entry {
@@ -63,15 +64,11 @@ export class DecisionCache {
 
 /**
  * Stable cache key: a SHA-256 over every input that can change the verdict.
- * Order-independent for object keys via recursive canonicalisation.
+ * Order-independent for object keys via recursive canonicalisation. Mirrors
+ * `DecisionRequest::cacheKey()` in the PHP client.
  */
-export async function cacheKey(parts: unknown): Promise<string> {
-  const json = canonicalJson(parts);
-  const bytes = new TextEncoder().encode(json);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+export function cacheKey(parts: unknown): string {
+  return createHash('sha256').update(canonicalJson(parts)).digest('hex');
 }
 
 function canonicalJson(value: unknown): string {
