@@ -1,0 +1,88 @@
+{
+  "name": "@padosoft/laravel-iam-node",
+  "version": "1.0.0",
+  "description": "Thin, fail-closed TypeScript/Node client for the Laravel IAM control plane (PDP decisions/check + JWKS token verification).",
+  "keywords": [
+    "iam",
+    "authorization",
+    "pdp",
+    "rbac",
+    "rebac",
+    "abac",
+    "oauth2",
+    "oidc",
+    "jwks",
+    "laravel",
+    "padosoft",
+    "fail-closed"
+  ],
+  "license": "MIT",
+  "author": "Padosoft <support@padosoft.com> (https://www.padosoft.com)",
+  "homepage": "https://github.com/padosoft/laravel-iam-node#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/padosoft/laravel-iam-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/padosoft/laravel-iam-node/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./middleware": {
+      "import": {
+        "types": "./dist/middleware.d.ts",
+        "default": "./dist/middleware.js"
+      },
+      "require": {
+        "types": "./dist/middleware.d.cts",
+        "default": "./dist/middleware.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "jose": "^5.9.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^8.57.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
