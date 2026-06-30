@@ -59,15 +59,25 @@ export function requirePermission(
       return;
     }
 
-    const decision = await client.check({
-      subject,
-      permission,
-      ...optional('resource', resolveResource(req, options.resource)),
-      ...optional('organization', resolve(req, options.organization)),
-      ...optional('application', resolve(req, options.application)),
-      ...optional('currentAal', resolve(req, options.currentAal)),
-      context: resolve(req, options.context) ?? {},
-    });
+    // `check()` is itself fail-closed, but cache-key serialisation (`JSON.stringify`)
+    // can throw on a circular `context` BEFORE any deny is returned. Without this
+    // guard that throw becomes an unhandled rejection (Express 4 hangs the request,
+    // Express 5 / Fastify 500s) and silently bypasses the 403. Catch → deny.
+    let decision: Decision;
+    try {
+      decision = await client.check({
+        subject,
+        permission,
+        ...optional('resource', resolveResource(req, options.resource)),
+        ...optional('organization', resolve(req, options.organization)),
+        ...optional('application', resolve(req, options.application)),
+        ...optional('currentAal', resolve(req, options.currentAal)),
+        context: resolve(req, options.context) ?? {},
+      });
+    } catch {
+      reject(req, res, denyDecision('check-threw'), options.onDeny);
+      return;
+    }
 
     if (!isGranted(decision)) {
       reject(req, res, decision, options.onDeny);

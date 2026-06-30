@@ -70,6 +70,23 @@ describe('verifyToken', () => {
     await expect(client.verifyToken('')).rejects.toBeInstanceOf(TokenVerificationError);
   });
 
+  it('fail-closed: rejects when no audience is configured (never accept-any-aud)', async () => {
+    const kit = await makeSigningKit({ iss: ISS });
+    const token = await kit.sign({ sub: 'usr_123' }, { aud: 'warehouse' });
+    // No `audience` in client defaults nor in the call options → must throw,
+    // not silently skip the `aud` check (jose's default when audience is absent).
+    const client = new IamClient({
+      baseUrl: BASE,
+      fetch: kit.fetch,
+      verify: { issuer: ISS, jwksUri: kit.jwksUri },
+    });
+
+    await expect(client.verifyToken(token)).rejects.toBeInstanceOf(TokenVerificationError);
+    // A per-call audience satisfies the requirement.
+    const claims = await client.verifyToken(token, { audience: 'warehouse' });
+    expect(claims.sub).toBe('usr_123');
+  });
+
   it('rejects when the JWKS endpoint is unreachable', async () => {
     const kit = await makeSigningKit({ iss: ISS });
     const token = await kit.sign({ sub: 'usr_123' }, { aud: 'warehouse' });

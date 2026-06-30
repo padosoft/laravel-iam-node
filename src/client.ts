@@ -143,12 +143,24 @@ export class IamClient {
     }
 
     const opts = { ...this.verifyDefaults, ...options };
+
+    // Fail-closed on audience: jose silently SKIPS the `aud` check when no
+    // audience is supplied, so a token minted for another service in the same
+    // cluster (right issuer, right signing key) would verify. Require an explicit
+    // audience rather than accept-any. Callers must set `verify.audience` (client
+    // default) or pass `options.audience`.
+    if (opts.audience === undefined) {
+      throw new TokenVerificationError(
+        'audience is required: set `verify.audience` on the client or pass `options.audience` to verifyToken',
+      );
+    }
+
     const uri = opts.jwksUri ?? this.defaultJwksUri();
     const issuer = opts.issuer ?? this.defaultIssuer();
     const verifyOptions = {
       algorithms: ['ES256'],
       ...(issuer !== undefined ? { issuer } : {}),
-      ...(opts.audience !== undefined ? { audience: opts.audience } : {}),
+      audience: opts.audience,
     };
 
     // First pass against the cached JWKS; on a key-resolution miss (likely a key
