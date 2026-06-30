@@ -16,7 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [18, 20, 22]
+        # Test toolchain (vitest 4 / vite 7) requires Node >=20; the published
+        # SDK itself still supports Node >=18 at runtime (jose + native fetch).
+        node: [20, 22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +30,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # `npm install` (not `npm ci`): the Windows-generated lockfile omits
+        # Linux-only optional dep nodes (rollup wasm fallback / @emnapi/*), a known
+        # npm cross-OS gap that breaks `npm ci`'s strict sync check.
+        run: npm install --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck

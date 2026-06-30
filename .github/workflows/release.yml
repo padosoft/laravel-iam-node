@@ -22,7 +22,12 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        run: npm ci
+        # `npm install` (not `npm ci`): the committed lockfile is generated on
+        # Windows and omits Linux-only optional dep NODES (@emnapi/*, the rollup
+        # wasm fallback referenced as edges) — a known npm cross-OS lockfile gap
+        # that makes `npm ci`'s strict sync check fail. `npm install` honours the
+        # lockfile for everything present and materialises the missing optionals.
+        run: npm install --no-audit --no-fund
 
       - name: Build
         run: npm run build
