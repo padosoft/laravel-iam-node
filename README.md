@@ -71,12 +71,21 @@ The cache (opt-in, off by default) never turns a deny into an allow: it stores t
 | Option | Default | Description |
 | --- | --- | --- |
 | `baseUrl` | — (required) | Full API base, e.g. `https://iam.example.com/api/iam/v1`. |
-| `token` | — | Service token sent as `Authorization: Bearer`. |
+| `token` | — | Static service token sent as `Authorization: Bearer`. |
+| `clientId` + `clientSecret` | — | **Self-managed `client_credentials`**: the client mints/refreshes the token itself and **auto-follows IAM's client-secret rotation** (self-fetch), so a long-running service never breaks on a rotation and you never handle a secret by hand. Takes precedence over `token`. |
+| `oauthUrl` | `<origin>/oauth` | OAuth base for the token + self-fetch endpoints. |
 | `timeoutMs` | `2000` | Per-request timeout. |
 | `retries` | `0` | Retries for **idempotent network errors only** (never on 4xx/5xx). |
 | `cache` | off | `{ ttlMs, maxEntries? }` short-TTL decision cache. |
 | `verify` | — | `{ issuer?, audience?, jwksUri? }` defaults for `verifyToken`. |
 | `fetch` | global | Inject a custom `fetch` (tests, proxies). |
+
+**Auto-rotating credentials** (recommended for long-lived services): pass `clientId` + `clientSecret`
+instead of a static `token`. The client obtains an access token via `client_credentials` and, when IAM
+auto-rotates the secret, self-fetches the new one from `POST /oauth/client-secret` (authenticating with the
+still-valid secret during the grace) and hot-swaps it — zero downtime. Enable the endpoint server-side with
+`IAM_OAUTH_CLIENT_SELFFETCH=true`. See
+[Application credentials & lifecycle](https://doc.laravel-iam-server.padosoft.com/guides/application-credentials).
 
 ### `check(query): Promise<Decision>`
 

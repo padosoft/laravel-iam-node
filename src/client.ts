@@ -7,6 +7,11 @@ import {
 import { DecisionCache, cacheKey } from './cache.js';
 import { decisionFromBody, deny, isGranted } from './decision.js';
 import { TokenVerificationError } from './errors.js';
+import {
+  clientCredentialsTokenProvider,
+  staticTokenProvider,
+  type TokenProvider,
+} from './token-provider.js';
 import type {
   Claims,
   Decision,
@@ -31,7 +36,7 @@ const DEFAULT_LIST_RESOURCES_PATH = 'decisions/list-resources';
  */
 export class IamClient {
   private readonly baseUrl: string;
-  private readonly token?: string;
+  private readonly tokens: TokenProvider;
   private readonly timeoutMs: number;
   private readonly retries: number;
   private readonly fetchImpl: typeof fetch;
@@ -47,10 +52,21 @@ export class IamClient {
       throw new Error('IamClient: `baseUrl` is required');
     }
     this.baseUrl = config.baseUrl.replace(/\/+$/, '');
-    if (config.token !== undefined) this.token = config.token;
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.retries = Math.max(0, config.retries ?? 0);
     this.fetchImpl = config.fetch ?? globalThis.fetch;
+    // Auth: self-managed client_credentials (mints/refreshes the token + auto-follows secret rotation via
+    // self-fetch) when clientId+clientSecret are set; otherwise the static token. Takes precedence.
+    this.tokens =
+      config.clientId && config.clientSecret
+        ? clientCredentialsTokenProvider({
+            fetch: this.fetchImpl,
+            oauthUrl: config.oauthUrl ?? new URL('/oauth', this.baseUrl).href.replace(/\/+$/, ''),
+            clientId: config.clientId,
+            clientSecret: config.clientSecret,
+            timeoutMs: this.timeoutMs,
+          })
+        : staticTokenProvider(config.token);
     this.cache = new DecisionCache(config.cache?.ttlMs ?? 0, config.cache?.maxEntries);
     this.checkPath = trimPath(config.checkPath ?? DEFAULT_CHECK_PATH);
     this.listResourcesPath = trimPath(config.listResourcesPath ?? DEFAULT_LIST_RESOURCES_PATH);
@@ -201,7 +217,8 @@ export class IamClient {
       Accept: 'application/json',
       'Content-Type': 'application/json',
     };
-    if (this.token !== undefined) headers.Authorization = `Bearer ${this.token}`;
+    const token = await this.tokens();
+    if (token !== undefined) headers.Authorization = `Bearer ${token}`;
     const serialized = JSON.stringify(payload);
 
     for (let attempt = 0; attempt <= this.retries; attempt++) {
