@@ -105,8 +105,16 @@ export interface IamClientConfig {
    * `iam-client.http.base_url`.
    */
   baseUrl: string;
-  /** Service token (OAuth2 Client Credentials) sent as `Authorization: Bearer`. */
+  /** Static service token sent as `Authorization: Bearer`. Use this OR clientId+clientSecret. */
   token?: string;
+  /**
+   * Self-managed client_credentials auth: when both are set, the client mints/refreshes the token itself
+   * and auto-follows IAM's client-secret rotation (self-fetch). Takes precedence over `token`.
+   */
+  clientId?: string;
+  clientSecret?: string;
+  /** OAuth base for token + self-fetch, e.g. `https://iam.example.com/oauth`. Defaults to `<origin>/oauth`. */
+  oauthUrl?: string;
   /** Per-request timeout in milliseconds. Default 2000. */
   timeoutMs?: number;
   /** Retries for idempotent network errors only (never on 4xx/5xx). Default 0. */
