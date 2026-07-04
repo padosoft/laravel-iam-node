@@ -9,6 +9,7 @@ import { decisionFromBody, deny, isGranted } from './decision.js';
 import { TokenVerificationError } from './errors.js';
 import {
   clientCredentialsTokenProvider,
+  privateKeyJwtTokenProvider,
   staticTokenProvider,
   type TokenProvider,
 } from './token-provider.js';
@@ -55,18 +56,29 @@ export class IamClient {
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.retries = Math.max(0, config.retries ?? 0);
     this.fetchImpl = config.fetch ?? globalThis.fetch;
-    // Auth: self-managed client_credentials (mints/refreshes the token + auto-follows secret rotation via
-    // self-fetch) when clientId+clientSecret are set; otherwise the static token. Takes precedence.
-    this.tokens =
-      config.clientId && config.clientSecret
-        ? clientCredentialsTokenProvider({
-            fetch: this.fetchImpl,
-            oauthUrl: config.oauthUrl ?? new URL('/oauth', this.baseUrl).href.replace(/\/+$/, ''),
-            clientId: config.clientId,
-            clientSecret: config.clientSecret,
-            timeoutMs: this.timeoutMs,
-          })
-        : staticTokenProvider(config.token);
+    // Auth precedence: private_key_jwt (signed assertion, no secret) → self-managed client_credentials
+    // (mint/refresh + auto-follow secret rotation via self-fetch) → static token.
+    const oauthUrl = config.oauthUrl ?? new URL('/oauth', this.baseUrl).href.replace(/\/+$/, '');
+    if (config.clientId && config.privateKey) {
+      this.tokens = privateKeyJwtTokenProvider({
+        fetch: this.fetchImpl,
+        oauthUrl,
+        clientId: config.clientId,
+        privateKeyPem: config.privateKey,
+        ...(config.privateKeyKid !== undefined ? { kid: config.privateKeyKid } : {}),
+        timeoutMs: this.timeoutMs,
+      });
+    } else if (config.clientId && config.clientSecret) {
+      this.tokens = clientCredentialsTokenProvider({
+        fetch: this.fetchImpl,
+        oauthUrl,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        timeoutMs: this.timeoutMs,
+      });
+    } else {
+      this.tokens = staticTokenProvider(config.token);
+    }
     this.cache = new DecisionCache(config.cache?.ttlMs ?? 0, config.cache?.maxEntries);
     this.checkPath = trimPath(config.checkPath ?? DEFAULT_CHECK_PATH);
     this.listResourcesPath = trimPath(config.listResourcesPath ?? DEFAULT_LIST_RESOURCES_PATH);

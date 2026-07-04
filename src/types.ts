@@ -113,6 +113,13 @@ export interface IamClientConfig {
    */
   clientId?: string;
   clientSecret?: string;
+  /**
+   * private_key_jwt (RFC 7523): an ES256 private key (PKCS#8 PEM). With clientId set, the client signs a
+   * short-lived assertion instead of sending any secret. Highest precedence. Register the public key in IAM.
+   */
+  privateKey?: string;
+  /** kid of the registered public key, written into the assertion header. */
+  privateKeyKid?: string;
   /** OAuth base for token + self-fetch, e.g. `https://iam.example.com/oauth`. Defaults to `<origin>/oauth`. */
   oauthUrl?: string;
   /** Per-request timeout in milliseconds. Default 2000. */

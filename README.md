@@ -72,6 +72,7 @@ The cache (opt-in, off by default) never turns a deny into an allow: it stores t
 | --- | --- | --- |
 | `baseUrl` | — (required) | Full API base, e.g. `https://iam.example.com/api/iam/v1`. |
 | `token` | — | Static service token sent as `Authorization: Bearer`. |
+| `clientId` + `privateKey` (+ `privateKeyKid`) | — | **`private_key_jwt` (RFC 7523)** — asymmetric, no shared secret. `privateKey` is an ES256 PKCS#8 PEM; the client signs a short-lived assertion per token request. **Highest precedence.** Register the matching public key (JWKS) in IAM. |
 | `clientId` + `clientSecret` | — | **Self-managed `client_credentials`**: the client mints/refreshes the token itself and **auto-follows IAM's client-secret rotation** (self-fetch), so a long-running service never breaks on a rotation and you never handle a secret by hand. Takes precedence over `token`. |
 | `oauthUrl` | `<origin>/oauth` | OAuth base for the token + self-fetch endpoints. |
 | `timeoutMs` | `2000` | Per-request timeout. |
