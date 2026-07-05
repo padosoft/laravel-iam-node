@@ -41,11 +41,13 @@ describe('submitManifest', () => {
     expect(res.data).toEqual({ version: 4, status: 'approved' });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(`${BASE}/applications/shop/manifests`);
-    const headers = calls[0].init?.headers as Record<string, string>;
+    const call = calls[0];
+    if (!call) throw new Error('no request captured');
+    expect(call.url).toBe(`${BASE}/applications/shop/manifests`);
+    const headers = call.init?.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer svc-token');
     expect(headers['Idempotency-Key']).toBeTruthy();
-    expect(calls[0].body).toEqual({ manifest: VALID });
+    expect(call.body).toEqual({ manifest: VALID });
   });
 
   it('fails locally (no network) when the manifest is invalid', async () => {
