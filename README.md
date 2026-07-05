@@ -113,6 +113,32 @@ try {
 }
 ```
 
+### `validateManifest(manifest)` / `submitManifest(manifest, opts)`
+
+A node service that owns a permission catalog **declares** it in a manifest (a versioned file — it *is* your
+source of truth) and pushes it to IAM. `validateManifest` checks it locally against the
+`laravel-iam.manifest.v2` rules (mirrors the server + the published schema at
+`/.well-known/iam-manifest-schema.json`); `submitManifest` POSTs it to the Admin API.
+
+```ts
+import { validateManifest, submitManifest } from '@padosoft/laravel-iam-node';
+
+const manifest = JSON.parse(await readFile('iam.manifest.json', 'utf8'));
+
+const { valid, errors } = validateManifest(manifest);
+if (!valid) throw new Error(errors.join('; '));
+
+const res = await submitManifest(manifest, {
+  baseUrl: 'https://your-iam.example.com/api/iam/v1',
+  token: process.env.IAM_TOKEN!, // needs iam:manifests.submit
+});
+// res.ok / res.status / res.data — IAM diffs it: additive changes apply, a removal is gated for approval
+// and the removed role/permission is DEPRECATED (kept, disabled), never deleted.
+```
+
+Run it in CI on deploy for hands-off sync. See
+[Keeping IAM in sync](https://doc.laravel-iam-server.padosoft.com/guides/keeping-in-sync).
+
 ## Middleware (Express / Fastify)
 
 ```ts
