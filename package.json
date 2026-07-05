@@ -1,6 +1,6 @@
 {
   "name": "@padosoft/laravel-iam-node",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Thin, fail-closed TypeScript/Node client for the Laravel IAM control plane (PDP decisions/check + JWKS token verification).",
   "keywords": [
     "iam",
