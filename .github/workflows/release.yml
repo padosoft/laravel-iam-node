@@ -21,6 +21,22 @@ jobs:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
 
+      # Fail fast when a tag is pushed without bumping package.json. Without this
+      # the job installs, builds and packs, then dies at the registry with an
+      # opaque `E403 ... cannot publish over the previously published versions`.
+      # Skipped on workflow_dispatch (ref_type == 'branch'), which publishes the
+      # manifest version as-is on purpose.
+      - name: Verify tag matches package.json version
+        if: github.ref_type == 'tag'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${pkg}. Bump the version in package.json, commit it, then re-tag."
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches package.json version ${pkg}."
+
       - name: Install dependencies
         # `npm install` (not `npm ci`): the committed lockfile is generated on
         # Windows and omits Linux-only optional dep NODES (@emnapi/*, the rollup
