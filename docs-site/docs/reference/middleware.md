@@ -122,8 +122,36 @@ interface MiddlewareResponse {
 
 Any object satisfying these works — which is exactly how one function serves both frameworks. See [Express middleware](/guides/express) and [Fastify middleware](/guides/fastify).
 
+## `requireDelegatedPermission(client, permission, options?)`
+
+Gates a route behind a **delegated** permission — an agent acting for a user. Requires [`laravel-iam-agents`](https://doc.laravel-iam-agents.padosoft.com) on the server; full walkthrough in [Delegated access](/guides/delegated-access).
+
+```ts
+import { requireDelegatedPermission } from '@padosoft/laravel-iam-node/middleware';
+
+app.post('/orders/:id/draft', requireDelegatedPermission(iam, 'orders.draft', {
+  resource: (req) => ({ type: 'order', id: req.params.id }),
+}), draftHandler);
+```
+
+| Option | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `token` | `Resolver<string>` | `Authorization: Bearer …` | Where to read the raw bearer from. |
+| `resource` | `Resolver<Resource \| string>` | — | Target of the action. |
+| `context` | `Resolver<DecisionContext>` | `{}` | ABAC facts. |
+| `organization` / `application` / `currentAal` | `Resolver<string>` | — | Passed through to the PDP. |
+| `onUnauthenticated` | `(req, res) => unknown` | 401 `{ error: 'unauthenticated' }` | Token absent, not delegated, or unverifiable. |
+| `onDeny` | `(req, res, decision) => unknown` | 403 | Same shape as `requirePermission`. |
+
+**Flow:** read the bearer → `verifyDelegatedToken` (introspection) → `checkDelegated` with `delegation_grant_id` → `next()`. On success `req.iamDelegation` carries the verified `{ sub, actors, grantId, scopes }`; on a denial nothing is attached.
+
+::: callout warning "A non-delegated token is a 401 here"
+This middleware does **not** fall back to the plain user path. The route exists to say "only delegated callers reach this", and silently accepting a full-authority user token would hand it more than any delegation allows. Mount `requirePermission` for routes humans call directly.
+:::
+
 ## Next steps
 
 - [IamClient API](/reference/client) — the client the middleware drives.
+- [Delegated access](/guides/delegated-access) — agents acting on behalf of users.
 - [Types](/reference/types) — `Subject`, `Resource`, `DecisionContext`.
 - [Step-up & AAL](/concepts/step-up-aal) — handling `step_up_required` in `onDeny`.

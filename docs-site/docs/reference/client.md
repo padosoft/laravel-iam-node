@@ -110,6 +110,63 @@ Options merge over the client's `verify` defaults. **Rejects when:** the token i
 Without an `audience` (from `options` or the client default), `verifyToken` rejects with `audience is required: …`. This closes the confused-deputy hole where `jose` would otherwise skip the `aud` check.
 :::
 
+## Delegated access
+
+Present only when the server runs [`laravel-iam-agents`](https://doc.laravel-iam-agents.padosoft.com). Full walkthrough: [Delegated access](/guides/delegated-access).
+
+### `checkDelegated(subject, actors, permission, options?): Promise<Decision>`
+
+Asks whether an **agent may act on behalf of a user**. Routes to `POST {baseUrl}/decisions/check-delegated`, sending `actors` (and `delegation_grant_id` when supplied) alongside the normal body. The verdict is the strict intersection of the subject and every actor — never the union.
+
+| Argument | Type | Notes |
+| --- | --- | --- |
+| `subject` | `{ type?, id }` | The **user**, never the agent. |
+| `actors` | `string[]` | Act chain, `agent:<id>`, **current actor first**, root last. |
+| `permission` | `string` | The permission being checked. |
+| `options` | `Omit<DecisionQuery, 'subject' \| 'permission' \| 'actors'>` | `resource`, `context`, `organization`, `application`, `currentAal`, `explain`, `delegationGrantId`. |
+
+**Denies without calling the server when:** the subject has no `id` (`no-subject`), or the chain is empty after dropping blanks (`no-actor`). Everything else is fail-closed as usual.
+
+### `canDelegated(subject, actors, permission, options?): Promise<boolean>`
+
+`isGranted(await checkDelegated(...))` — `true` only when allowed **and** no step-up is pending.
+
+### `verifyDelegatedToken(jwt): Promise<DelegatedBearer | null>`
+
+Verifies a delegated bearer through **RFC 7662 introspection** and returns the authorization view, or `null`. Fail-closed **without throwing**: every failure path resolves to `null`.
+
+```ts
+interface DelegatedBearer {
+  sub: string;        // the delegating user
+  actors: string[];   // act chain, current actor first
+  grantId: string | null;
+  scopes: string[];
+  verified: boolean;  // always true on a value returned by this method
+}
+```
+
+**Returns `null` when:** the token is not a JWT; it is not delegated (use [`verifyToken`](#verifytokenjwt-options-promiseclaims) instead — this is not an error); the `act` is malformed; `introspectionUrl` is empty; introspection is unreachable or non-200; the response says `active: false`; the response omits `sub` or carries an unreadable `act`.
+
+::: callout danger "Introspection is not optional"
+The authorization view is built from the **introspected** claims, never the local parse. Only the server knows the delegating user's session is still alive. No introspection reachable ⇒ deny. `typ: delegated+jwt` is routing, not a defence.
+:::
+
+Delegated decisions **bypass the cache** unconditionally, so a revocation is never masked by a cached allow.
+
+## Delegation helpers
+
+Lower-level exports, for callers doing their own routing:
+
+| Export | Signature | Use |
+| --- | --- | --- |
+| `inspectDelegatedBearer` | `(jwt: string) => DelegatedBearer \| null` | Local, unverified inspection (`verified: false`). **Routing only** — never authorization. Throws `MalformedDelegationError` on a broken delegated token. |
+| `actorChainFromClaims` | `(claims) => string[] \| null` | Flatten a nested `act` claim, current actor first. `null` = not delegated; throws when malformed. |
+| `delegatedBearerFromClaims` | `(claims, verified) => DelegatedBearer \| null` | Build the view from a claim set. |
+| `isDelegated` | `(claims) => boolean` | Does this claim set carry `act`? |
+| `parseScopes` | `(scope: unknown) => string[]` | Split an OAuth `scope` string. |
+| `TYP_DELEGATED` | `'delegated+jwt'` | The `typ` header value. |
+| `MalformedDelegationError` | `Error` | Thrown when a token **is** delegated but unreadable. |
+
 ## Exported helpers
 
 `index.ts` also exports the pure decision helpers, useful when you hold a `Decision` directly:
@@ -122,6 +179,6 @@ Without an `audience` (from `options` or the client default), `verifyToken` reje
 
 ## Next steps
 
-- [Middleware API](/reference/middleware) — `requirePermission`.
+- [Middleware API](/reference/middleware) — `requirePermission`, `requireDelegatedPermission`.
 - [Types](/reference/types) — every interface.
 - [Errors](/reference/errors) — `TokenVerificationError`.

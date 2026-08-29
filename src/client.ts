@@ -6,6 +6,12 @@ import {
 } from 'jose';
 import { DecisionCache, cacheKey } from './cache.js';
 import { decisionFromBody, deny, isGranted } from './decision.js';
+import {
+  delegatedBearerFromClaims,
+  inspectDelegatedBearer,
+  MalformedDelegationError,
+  type DelegatedBearer,
+} from './delegation.js';
 import { TokenVerificationError } from './errors.js';
 import {
   clientCredentialsTokenProvider,
@@ -25,6 +31,7 @@ import type {
 const DEFAULT_TIMEOUT_MS = 2000;
 const DEFAULT_CHECK_PATH = 'decisions/check';
 const DEFAULT_LIST_RESOURCES_PATH = 'decisions/list-resources';
+const DEFAULT_CHECK_DELEGATED_PATH = 'decisions/check-delegated';
 
 /**
  * Thin, fail-closed client for the Laravel IAM control plane.
@@ -44,6 +51,8 @@ export class IamClient {
   private readonly cache: DecisionCache;
   private readonly checkPath: string;
   private readonly listResourcesPath: string;
+  private readonly checkDelegatedPath: string;
+  private readonly introspectionUrl: string;
   private readonly verifyDefaults: VerifyOptions;
   private readonly jwksMaxAgeMs: number;
   private readonly jwks = new Map<string, { keySet: JWTVerifyGetKey; fetchedAt: number }>();
@@ -82,6 +91,8 @@ export class IamClient {
     this.cache = new DecisionCache(config.cache?.ttlMs ?? 0, config.cache?.maxEntries);
     this.checkPath = trimPath(config.checkPath ?? DEFAULT_CHECK_PATH);
     this.listResourcesPath = trimPath(config.listResourcesPath ?? DEFAULT_LIST_RESOURCES_PATH);
+    this.checkDelegatedPath = trimPath(config.checkDelegatedPath ?? DEFAULT_CHECK_DELEGATED_PATH);
+    this.introspectionUrl = config.introspectionUrl ?? `${oauthUrl}/introspect`;
     this.verifyDefaults = config.verify ?? {};
     this.jwksMaxAgeMs = 10 * 60 * 1000; // refetch JWKS at most every 10 minutes
 
@@ -104,15 +115,20 @@ export class IamClient {
 
     const payload = toPayload(query);
     const explain = query.explain === true;
+    const delegated = payload['actors'] !== undefined;
 
-    // Explain queries are never cached (fresh, non-shared reasoning).
-    const key = !explain && this.cache.enabled ? cacheKey(payload) : undefined;
+    // Explain queries are never cached (fresh, non-shared reasoning), and neither
+    // are DELEGATED ones: a grant can be revoked at any moment, and the whole point
+    // of short-lived delegation is that the verdict is never older than the request.
+    // A cached delegated allow would outlive the revocation that was supposed to
+    // stop it. The extra round-trip is the price of the kill switch actually working.
+    const key = !explain && !delegated && this.cache.enabled ? cacheKey(payload) : undefined;
     if (key !== undefined) {
       const cached = this.cache.get(key);
       if (cached) return cached;
     }
 
-    const body = await this.requestJson(this.checkPath, payload);
+    const body = await this.requestJson(delegated ? this.checkDelegatedPath : this.checkPath, payload);
     if (body === undefined) {
       // Transport error / non-2xx / malformed body: fail closed. Never cached —
       // a synthetic deny must not outlive the outage that caused it.
@@ -132,6 +148,109 @@ export class IamClient {
    */
   async can(query: DecisionQuery): Promise<boolean> {
     return isGranted(await this.check(query));
+  }
+
+  /**
+   * Ask the PDP whether an AGENT may do something ON BEHALF OF a user.
+   *
+   * The verdict is the strict intersection — the subject's authority AND every
+   * actor's authority AND the grant's scope — never the union. Adding a hop can
+   * only ever narrow what is permitted; it can never grant anything new. An empty
+   * chain is not "check the user instead", it is a deny: calling the delegated
+   * path with no actor means the caller lost track of who is acting.
+   *
+   * @param actors act chain, `agent:<id>`, CURRENT actor first
+   */
+  async checkDelegated(
+    subject: { type?: string; id: string },
+    actors: string[],
+    permission: string,
+    options: Omit<DecisionQuery, 'subject' | 'permission' | 'actors'> = {},
+  ): Promise<Decision> {
+    if (!subject || !subject.id) return deny('no-subject');
+
+    const chain = (actors ?? []).filter((a): a is string => typeof a === 'string' && a !== '');
+    if (chain.length === 0) return deny('no-actor');
+
+    return this.check({ ...options, subject, permission, actors: chain });
+  }
+
+  /**
+   * Fail-safe wrapper around {@link checkDelegated}: `true` only when the PDP
+   * allowed AND no step-up is pending. Mirrors PHP `IamClient::canDelegated()`.
+   */
+  async canDelegated(
+    subject: { type?: string; id: string },
+    actors: string[],
+    permission: string,
+    options: Omit<DecisionQuery, 'subject' | 'permission' | 'actors'> = {},
+  ): Promise<boolean> {
+    return isGranted(await this.checkDelegated(subject, actors, permission, options));
+  }
+
+  /**
+   * Verify a DELEGATED bearer token. Delegated tokens are INTROSPECTION-MANDATORY
+   * (RFC 7662): the authorization view is built from the claims the server returns
+   * — it verifies the signature, the expiry AND that the user's session is still
+   * alive — never from the local parse. `typ: delegated+jwt` is routing, not a
+   * defence.
+   *
+   * Fail-closed WITHOUT throwing: any problem at all (not delegated, malformed,
+   * no introspection endpoint, transport failure, inactive token, incoherent
+   * claims) resolves to `null`, which callers must treat as a 401.
+   *
+   * Returns `null` for a NON-delegated token too: that token is not this method's
+   * business — verify it with {@link verifyToken} on the normal path.
+   */
+  async verifyDelegatedToken(jwt: string): Promise<DelegatedBearer | null> {
+    let local: DelegatedBearer | null;
+    try {
+      local = inspectDelegatedBearer(jwt);
+    } catch (err) {
+      if (err instanceof MalformedDelegationError) return null; // never degrade
+      return null;
+    }
+    if (local === null) return null; // not delegated: not this path
+
+    if (this.introspectionUrl === '') return null; // no introspection ⇒ no delegated authority
+
+    const body = await this.introspect(jwt);
+    if (body === undefined) return null;
+    if (body['active'] !== true) return null;
+
+    // The authorization view comes from the INTROSPECTED claims (server-side truth),
+    // falling back to the local values only for fields introspection may omit.
+    try {
+      const introspected = delegatedBearerFromClaims(body, true);
+      if (introspected !== null) {
+        return {
+          sub: introspected.sub,
+          actors: introspected.actors,
+          grantId: introspected.grantId ?? local.grantId,
+          scopes: introspected.scopes.length > 0 ? introspected.scopes : local.scopes,
+          verified: true,
+        };
+      }
+    } catch {
+      return null; // introspection returned an unreadable act: refuse
+    }
+
+    // Active, but the server did not echo `act`: keep the local chain, which the
+    // signature-verified introspection has just vouched for as a whole.
+    const sub = body['sub'];
+    if (typeof sub !== 'string' || sub === '') return null;
+    const grantId = body['pds_dgr'];
+    const scope = body['scope'];
+
+    return {
+      sub,
+      actors: local.actors,
+      grantId: typeof grantId === 'string' && grantId !== '' ? grantId : local.grantId,
+      scopes: typeof scope === 'string' && scope !== ''
+        ? scope.split(' ').filter((s) => s !== '')
+        : local.scopes,
+      verified: true,
+    };
   }
 
   /**
@@ -263,6 +382,42 @@ export class IamClient {
   }
 
   /**
+   * RFC 7662 introspection. Form-encoded, like the PHP client, because that is
+   * what the spec mandates and what the server's endpoint accepts. Returns the
+   * parsed body, or `undefined` on any failure (fail-closed at the call site).
+   */
+  private async introspect(jwt: string): Promise<Record<string, unknown> | undefined> {
+    const form = new URLSearchParams({ token: jwt });
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+    // Introspection authenticates the CALLER (the resource server), not the token.
+    const token = await this.tokens();
+    if (token !== undefined) headers.Authorization = `Bearer ${token}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await this.fetchImpl(this.introspectionUrl, {
+        method: 'POST',
+        headers,
+        body: form.toString(),
+        signal: controller.signal,
+        redirect: 'manual',
+      });
+      if (response.status !== 200) return undefined;
+      const body: unknown = await response.json();
+      if (typeof body !== 'object' || body === null || Array.isArray(body)) return undefined;
+      return body as Record<string, unknown>;
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
    * Return a local JWKS key set for `uri`, fetched through the client's own
    * `fetch` (so it honours the configured fetch/timeout and is testable). Cached
    * for {@link jwksMaxAgeMs}; `force` bypasses the cache for rotation handling.
@@ -343,7 +498,7 @@ function unwrap(body: unknown): unknown {
  * all keys present (nulls included), `subject.type` defaulted to `user`.
  */
 function toPayload(query: DecisionQuery): Record<string, unknown> {
-  return {
+  const body: Record<string, unknown> = {
     subject: { type: query.subject.type ?? 'user', id: query.subject.id },
     permission: query.permission,
     organization: query.organization ?? null,
@@ -353,4 +508,17 @@ function toPayload(query: DecisionQuery): Record<string, unknown> {
     current_aal: query.currentAal ?? 'aal1',
     explain: query.explain === true,
   };
+
+  // Delegation keys are ONLY present on delegated queries: the plain-check body
+  // must stay byte-identical to what it has always been, so an older server that
+  // never heard of delegation is unaffected.
+  const actors = (query.actors ?? []).filter((a): a is string => typeof a === 'string' && a !== '');
+  if (actors.length > 0) {
+    body['actors'] = actors;
+    if (typeof query.delegationGrantId === 'string' && query.delegationGrantId !== '') {
+      body['delegation_grant_id'] = query.delegationGrantId;
+    }
+  }
+
+  return body;
 }

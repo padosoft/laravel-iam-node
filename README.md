@@ -18,6 +18,7 @@ Laravel IAM is an **Identity & Authorization control plane** (PDP) for multi-app
 - **Fail-closed by construction.** Any network error, timeout, 5xx, 4xx, malformed body, or unverifiable token resolves to **deny** — never allow. There is no fail-open switch. An unreachable PDP must never open the doors.
 - **No PDP logic client-side.** The verdict always comes from the server's `decisions/check`. The client never interprets grants or policies.
 - **Drop-in parity.** Same endpoint, payload, Bearer auth and response handling as the PHP `HttpDecider` — the server can't tell the callers apart.
+- **Act-aware.** Agents acting for users are first-class: the act chain is parsed, the decision is the strict intersection of every identity in it, and delegated verdicts are never cached.
 - **Zero heavy deps.** Native `fetch` (Node 18+) and [`jose`](https://github.com/panva/jose) for JWKS verification. ESM + CJS + types.
 
 ## Install
@@ -77,7 +78,9 @@ The cache (opt-in, off by default) never turns a deny into an allow: it stores t
 | `oauthUrl` | `<origin>/oauth` | OAuth base for the token + self-fetch endpoints. |
 | `timeoutMs` | `2000` | Per-request timeout. |
 | `retries` | `0` | Retries for **idempotent network errors only** (never on 4xx/5xx). |
-| `cache` | off | `{ ttlMs, maxEntries? }` short-TTL decision cache. |
+| `cache` | off | `{ ttlMs, maxEntries? }` short-TTL decision cache. Delegated decisions bypass it by design. |
+| `introspectionUrl` | `<oauthUrl>/introspect` | RFC 7662 endpoint. **Required to accept delegated tokens** — set it to `''` to refuse them outright. |
+| `checkDelegatedPath` | `decisions/check-delegated` | Path for the delegated PDP check. |
 | `verify` | — | `{ issuer?, audience?, jwksUri? }` defaults for `verifyToken`. |
 | `fetch` | global | Inject a custom `fetch` (tests, proxies). |
 
@@ -112,6 +115,43 @@ try {
   return res.status(401).end(); // fail-closed
 }
 ```
+
+### Delegated access — `checkDelegated` / `canDelegated` / `verifyDelegatedToken`
+
+When an **AI agent acts on behalf of a user**, the token carries *two* identities: `sub` is the user, `act` is the agent (nested, outermost-first, when the chain is longer than one hop — RFC 8693 §4.1). The verdict is the **strict intersection** of what the user may do and what *every* actor in the chain may do — never the union. Adding a hop can only narrow authority; it can never grant anything.
+
+```ts
+const bearer = await iam.verifyDelegatedToken(token);
+if (bearer === null) return res.status(401).end(); // not delegated, or not verifiable
+
+const ok = await iam.canDelegated(
+  { id: bearer.sub },          // the USER — never the agent
+  bearer.actors,               // ['agent:hop2', 'agent:hop1'] — current actor first
+  'orders.draft',
+  { resource: { type: 'order', id: orderId }, delegationGrantId: bearer.grantId },
+);
+```
+
+Three rules this SDK enforces for you, because getting any of them wrong turns delegation into an escalation path:
+
+- **Delegated tokens are introspection-mandatory** (RFC 7662). `verifyDelegatedToken` never builds its answer from the local bytes: it calls the server's `/oauth/introspect`, which re-checks the signature, the expiry **and that the user's session is still alive**. No introspection reachable ⇒ `null` ⇒ deny. `typ: delegated+jwt` is routing, not a defence.
+- **Delegated decisions are never cached**, even with the decision cache enabled. A cached allow would outlive the revocation meant to stop it — and the kill switch working *now* is the entire point of short-lived delegation. Plain checks still cache as before.
+- **A malformed `act` throws; an absent one does not.** No `act` means "not delegated, use the normal path". An *unreadable* `act` means refuse — silently degrading it into a full-authority user token is precisely the confused deputy that delegation exists to prevent.
+
+`verifyDelegatedToken` is fail-closed **without throwing**: every failure path returns `null`.
+
+```ts
+import { requireDelegatedPermission } from '@padosoft/laravel-iam-node/middleware';
+
+app.post('/orders/:id/draft', requireDelegatedPermission(iam, 'orders.draft', {
+  resource: (req) => ({ type: 'order', id: req.params.id }),
+}), draftHandler);
+// On success `req.iamDelegation` carries the verified { sub, actors, grantId, scopes }.
+```
+
+A **non-delegated token is a 401 here**, not a fallback to the plain user path: the route says "only delegated callers", and quietly accepting a full-authority user token would defeat that. Mount `requirePermission` for routes humans call directly.
+
+Requires [`laravel-iam-agents`](https://doc.laravel-iam-agents.padosoft.com) on the server.
 
 ### `validateManifest(manifest)` / `submitManifest(manifest, opts)`
 
@@ -160,9 +200,10 @@ The subject defaults to `req.user.id` / `req.auth.sub`. A missing subject, an un
 
 This SDK speaks the canonical decision contract (`01-architecture.md` §12), mirroring the PHP client:
 
-- **Endpoint:** `POST {baseUrl}/decisions/check`
+- **Endpoint:** `POST {baseUrl}/decisions/check` — or `POST {baseUrl}/decisions/check-delegated` when an act chain is present
 - **Auth:** `Authorization: Bearer <service token>`, `Accept: application/json`
-- **Body:** `{ subject:{type,id}, permission, organization, application, resource, context, current_aal, explain }`
+- **Body:** `{ subject:{type,id}, permission, organization, application, resource, context, current_aal, explain }`, plus `actors` and `delegation_grant_id` on delegated queries only — a plain check's body is byte-identical to what it has always been
+- **Introspection:** `POST {oauthUrl}/introspect` (form-encoded, RFC 7662), used for delegated tokens
 - **Response:** the server's `Decision` (a `{ "data": { … } }` envelope is unwrapped transparently)
 
 ## Ecosystem
