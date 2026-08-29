@@ -39,6 +39,14 @@ export interface DecisionQuery {
   currentAal?: string;
   /** Ask the PDP for a step-by-step explanation. Explain queries are never cached. */
   explain?: boolean;
+  /**
+   * Delegation act chain (`agent:<id>`, CURRENT actor first). When present the
+   * query is routed to `decisions/check-delegated` and the verdict is the strict
+   * intersection of the subject and EVERY actor — never the union.
+   */
+  actors?: string[];
+  /** `pds_dgr` of the grant the delegation descends from, so revocation is enforced per-grant. */
+  delegationGrantId?: string | null;
 }
 
 /** One policy element the PDP matched while reaching its verdict. */
@@ -76,6 +84,10 @@ export interface Claims {
   org?: string;
   client_id?: string;
   sid?: string;
+  /** RFC 8693 §4.1 nested actor claim, present only on delegated tokens. */
+  act?: { sub?: string; act?: unknown };
+  /** Private claim: the delegation grant this token descends from. */
+  pds_dgr?: string;
   [k: string]: unknown;
 }
 
@@ -142,4 +154,16 @@ export interface IamClientConfig {
   checkPath?: string;
   /** Path appended to `baseUrl` for ReBAC list-resources. Default `decisions/list-resources`. */
   listResourcesPath?: string;
+  /**
+   * Path appended to `baseUrl` for the DELEGATED PDP check. Default
+   * `decisions/check-delegated` (the canonical server route).
+   */
+  checkDelegatedPath?: string;
+  /**
+   * RFC 7662 introspection endpoint, e.g. `https://iam.example.com/oauth/introspect`.
+   * REQUIRED to accept delegated tokens: they are introspection-mandatory, so
+   * without this {@link IamClient.verifyDelegatedToken} always denies.
+   * Defaults to `<oauthUrl>/introspect`.
+   */
+  introspectionUrl?: string;
 }

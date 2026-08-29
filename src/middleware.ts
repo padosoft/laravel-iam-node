@@ -1,5 +1,6 @@
 import type { IamClient } from './client.js';
 import { isGranted } from './decision.js';
+import type { DelegatedBearer } from './delegation.js';
 import type { Decision, DecisionContext, Resource, Subject } from './types.js';
 
 /**
@@ -148,6 +149,119 @@ function reject(
     required_aal: decision.requiredAal,
     decision_id: decision.decisionId,
   };
+  if (typeof r.json === 'function') r.json(body);
+  else if (typeof r.send === 'function') r.send(body);
+}
+
+// ---- delegated access -------------------------------------------------------
+
+export interface RequireDelegatedPermissionOptions {
+  resource?: Resolver<Resource | string>;
+  context?: Resolver<DecisionContext>;
+  organization?: Resolver<string>;
+  application?: Resolver<string>;
+  currentAal?: Resolver<string>;
+  /**
+   * How to pull the raw bearer out of the request. Defaults to the
+   * `Authorization: Bearer …` header.
+   */
+  token?: Resolver<string>;
+  /** Custom 401 handler for a token that is absent, not delegated, or unverifiable. */
+  onUnauthenticated?: (req: MiddlewareRequest, res: MiddlewareResponse) => unknown;
+  onDeny?: (req: MiddlewareRequest, res: MiddlewareResponse, decision: Decision) => unknown;
+}
+
+/**
+ * Gate a route behind a DELEGATED permission: an agent acting on behalf of a user.
+ *
+ * A NON-delegated token is a 401 here, not a fallback to the plain user path —
+ * this middleware exists precisely to say "only delegated callers reach this
+ * route", and quietly accepting a full-authority user token would defeat that.
+ * Mount {@link requirePermission} instead for routes humans call directly.
+ *
+ * On success the verified view is attached as `req.iamDelegation`, so handlers
+ * and logs can name both identities without re-parsing anything.
+ */
+export function requireDelegatedPermission(
+  client: IamClient,
+  permission: string,
+  options: RequireDelegatedPermissionOptions = {},
+) {
+  return async function (
+    req: MiddlewareRequest,
+    res: MiddlewareResponse,
+    next: (err?: unknown) => void,
+  ): Promise<void> {
+    const jwt = resolve(req, options.token) ?? bearerFrom(req);
+    if (jwt === undefined || jwt === '') {
+      unauthenticated(req, res, options.onUnauthenticated);
+      return;
+    }
+
+    let delegation: DelegatedBearer | null;
+    try {
+      delegation = await client.verifyDelegatedToken(jwt);
+    } catch {
+      delegation = null; // verifyDelegatedToken is fail-closed, but never trust that twice
+    }
+    if (delegation === null) {
+      unauthenticated(req, res, options.onUnauthenticated);
+      return;
+    }
+
+    let decision: Decision;
+    try {
+      decision = await client.checkDelegated(
+        { id: delegation.sub },
+        delegation.actors,
+        permission,
+        {
+          ...optional('resource', resolveResource(req, options.resource)),
+          ...optional('organization', resolve(req, options.organization)),
+          ...optional('application', resolve(req, options.application)),
+          ...optional('currentAal', resolve(req, options.currentAal)),
+          ...optional('delegationGrantId', delegation.grantId ?? undefined),
+          context: resolve(req, options.context) ?? {},
+        },
+      );
+    } catch {
+      reject(req, res, denyDecision('check-threw'), options.onDeny);
+      return;
+    }
+
+    if (!isGranted(decision)) {
+      reject(req, res, decision, options.onDeny);
+      return;
+    }
+
+    req['iamDelegation'] = delegation;
+    next();
+  };
+}
+
+/** Read `Authorization: Bearer <jwt>` off a request, case-insensitively. */
+function bearerFrom(req: MiddlewareRequest): string | undefined {
+  const headers = req['headers'];
+  if (typeof headers !== 'object' || headers === null) return undefined;
+  const raw = (headers as Record<string, unknown>)['authorization']
+    ?? (headers as Record<string, unknown>)['Authorization'];
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof header !== 'string') return undefined;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match?.[1];
+}
+
+function unauthenticated(
+  req: MiddlewareRequest,
+  res: MiddlewareResponse,
+  handler?: RequireDelegatedPermissionOptions['onUnauthenticated'],
+): void {
+  if (handler) {
+    handler(req, res);
+    return;
+  }
+  const r = res.status(401);
+  const body = { error: 'unauthenticated' };
   if (typeof r.json === 'function') r.json(body);
   else if (typeof r.send === 'function') r.send(body);
 }
